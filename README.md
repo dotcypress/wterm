@@ -8,12 +8,6 @@ You can check by typing `wterm --help`:
 
 ## Installation
 
-You can use the `cargo install` command:
-
-    $ cargo install wterm
-
-or a classic build and run:
-
 ```bash
 $ git clone https://github.com/dotcypress/wterm
 $ cd wterm
