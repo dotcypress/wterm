@@ -11,6 +11,5 @@ You can check by typing `wterm --help`:
 ```bash
 $ git clone https://github.com/dotcypress/wterm
 $ cd wterm
-$ cargo build --release
-$ cp target/release/wterm ~/.bin # assuming .bin is in your path
+$ cargo run --release
 ```
