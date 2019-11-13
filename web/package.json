@@ -1,0 +1,35 @@
+{
+  "name": "wterm",
+  "private": true,
+  "author": "Vitaly Domnikov <oss@vitaly.codes>",
+  "license": "MIT/Apache-2.0",
+  "scripts": {
+    "build": "rollup -c",
+    "test": "eslint .",
+    "dev": "rollup -c -w"
+  },
+  "engines": {
+    "node": ">=12.6.0"
+  },
+  "dependencies": {
+    "bulma": "^0.8.0",
+    "svelte": "^3.1.0",
+    "xterm": "^4.2.0",
+    "xterm-addon-fit": "^0.3.0"
+  },
+  "devDependencies": {
+    "eslint-config-standard": "^14.1.0",
+    "eslint-plugin-import": "^2.17.2",
+    "eslint-plugin-node": "^10.0.0",
+    "eslint-plugin-promise": "^4.1.1",
+    "eslint-plugin-standard": "^4.0.0",
+    "eslint": "^6.0.1",
+    "rollup-plugin-postcss": "^2.0.3",
+    "rollup": "^1.10.1",
+    "rollup-plugin-commonjs": "^10.0.1",
+    "rollup-plugin-css-only": "^1.0.0",
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-svelte": "^5.0.3",
+    "rollup-plugin-terser": "^5.1.1"
+  }
+}

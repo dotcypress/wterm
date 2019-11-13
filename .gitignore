@@ -1,0 +1,5 @@
+/target
+**/*.rs.bk
+web/node_modules
+web/package-lock.json
+static/*.map
