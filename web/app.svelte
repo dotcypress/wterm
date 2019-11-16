@@ -1,7 +1,7 @@
 <script>
   import "bulma/css/bulma.css";
   import "xterm/css/xterm.css";
-  import { onMount, createEventDispatcher } from "svelte";
+  import { onMount } from "svelte";
   import * as xterm from "xterm";
   import { FitAddon } from "xterm-addon-fit";
 
@@ -16,6 +16,7 @@
   let error = "";
   let busy = false;
   let connected = false;
+  let navbarOpen = false;
 
   onMount(async () => {
     connection.onopen = onOpen;
@@ -75,6 +76,10 @@
       ? connection.send("DISCONNECT")
       : connection.send(`CONNECT ${portName} ${baudrate}`);
   }
+
+  function toggleNavbar() {
+    navbarOpen = !navbarOpen;
+  }
 </script>
 
 <style>
@@ -94,14 +99,19 @@
   }
   .workspace {
     display: flex;
+    flex-direction: column;
     position: absolute;
-    top: 52px;
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
   }
   .workspace > div {
     flex: 1;
+  }
+  .workspace .navbar button, .workspace .navbar button:focus {
+    outline: none;
+    border: none;
   }
 </style>
 
@@ -111,57 +121,68 @@
   {/if}
 </div>
 
-<nav class="navbar is-dark is-fixed-top">
-  <div class="navbar-menu is-active has-background-dark">
-    <div class="navbar-start">
-      <div class="navbar-item has-text-danger">
+<div class="workspace">
+  <nav class="navbar is-dark">
+    <div class="navbar-brand">
+      <div class="navbar-item">
         <span
           class="tag is-info is-light is-family-code is-size-6
           has-text-weight-bold">
           wterm
         </span>
       </div>
+      <button
+        class="navbar-burger burger has-background-dark"
+        aria-hidden="true"
+        class:is-active={navbarOpen}
+        on:click={toggleNavbar}>
+        <span aria-hidden="true" />
+        <span aria-hidden="true" />
+        <span aria-hidden="true" />
+      </button>
     </div>
-    <div class="navbar-end">
-      <div class="navbar-item">
-        <div class="select is-small is-fullwidth">
-          <select bind:value={portName} disabled={busy || connected}>
-            {#each ports as port}
-              <option value={port}>{port}</option>
-            {/each}
-          </select>
+    <div
+      class="navbar-menu has-background-dark"
+      class:is-active={navbarOpen}>
+      <div class="navbar-end">
+        <div class="navbar-item">
+          <div class="select is-small is-fullwidth">
+            <select bind:value={portName} disabled={busy || connected}>
+              {#each ports as port}
+                <option value={port}>{port}</option>
+              {/each}
+            </select>
+          </div>
         </div>
-      </div>
-      <div class="navbar-item">
-        <input
-          class="input is-small"
-          type="text"
-          placeholder="Baudrate"
-          bind:value={baudrate}
-          disabled={busy || connected} />
-      </div>
+        <div class="navbar-item">
+          <input
+            class="input is-small"
+            type="text"
+            placeholder="Baudrate"
+            bind:value={baudrate}
+            disabled={busy || connected} />
+        </div>
 
-      <div class="navbar-item">
-        <div class="buttons">
-          <button
-            class="button is-small"
-            class:is-loading={busy}
-            class:is-primary={!connected}
-            class:is-danger={connected}
-            disabled={busy}
-            on:click={toggleConnection}>
-            {connected ? 'Disconnect' : 'Connect'}
-          </button>
-          <button
-            class="button is-light is-small"
-            on:click={() => terminal.clear()}>
-            Clear
-          </button>
+        <div class="navbar-item">
+          <div class="buttons">
+            <button
+              class="button is-small"
+              class:is-loading={busy}
+              class:is-primary={!connected}
+              class:is-danger={connected}
+              disabled={busy}
+              on:click={toggleConnection}>
+              {connected ? 'Disconnect' : 'Connect'}
+            </button>
+            <button
+              class="button is-light is-small"
+              on:click={() => terminal.clear()}>
+              Clear
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</nav>
-<div class="workspace">
+  </nav>
   <div use:term />
 </div>

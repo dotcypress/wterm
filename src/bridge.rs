@@ -91,6 +91,28 @@ impl BridgeSession {
             }
         };
     }
+    fn poll_serial(&mut self, ctx: &mut WebsocketContext<BridgeSession>) {
+        if let BridgeStatus::Connected(port) = &mut self.status {
+            while let Ok(len) = port.bytes_to_read() {
+                if len == 0 {
+                    break;
+                }
+                let mut buff = [0u8; 32 * 1024];
+                match port.read(&mut buff) {
+                    Ok(_) => {
+                        let mut data = Bytes::new();
+                        data.extend_from_slice(&buff[..len as usize]);
+                        ctx.binary(data);
+                    }
+                    Err(err) => {
+                        self.send_error(ctx, err);
+                        break;
+                    }
+                }
+            }
+        }
+        ctx.run_later(POLL_INTERVAL, |act, ctx| act.poll_serial(ctx));
+    }
 }
 
 impl Actor for BridgeSession {
@@ -103,24 +125,7 @@ impl Actor for BridgeSession {
             }
             ctx.stop();
         });
-        ctx.run_interval(POLL_INTERVAL, |act, ctx| {
-            if let BridgeStatus::Connected(port) = &mut act.status {
-                if let Ok(len) = port.bytes_to_read() {
-                    if len == 0 {
-                        return;
-                    }
-                    let mut buff = [0u8; 32 * 1024];
-                    match port.read(&mut buff) {
-                        Ok(_) => {
-                            let mut data = Bytes::new();
-                            data.extend_from_slice(&buff[..len as usize]);
-                            ctx.binary(data);
-                        }
-                        Err(err) => act.send_error(ctx, err),
-                    }
-                }
-            }
-        });
+        ctx.run_later(POLL_INTERVAL, |act, ctx| act.poll_serial(ctx));
     }
 }
 
