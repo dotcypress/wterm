@@ -1,11 +1,15 @@
 <script>
   import "bulma/css/bulma.css";
-  import { onMount } from "svelte";
-  import XTerm from "./xterm.svelte";
+  import "xterm/css/xterm.css";
+  import { onMount, createEventDispatcher } from "svelte";
+  import * as xterm from "xterm";
+  import { FitAddon } from "xterm-addon-fit";
 
   const connection = new WebSocket(`ws://${window.location.host}/ws`);
+  const terminal = new xterm.default.Terminal();
+  const fitAddon = new FitAddon();
+  terminal.loadAddon(fitAddon);
 
-  let terminal;
   let baudrate = 19200;
   let portName;
   let ports = [];
@@ -20,7 +24,14 @@
       error = "";
     };
     connection.onmessage = onMessage;
+    terminal.onData(data => connection.send(new Blob([data])));
+    window.addEventListener("resize", () => fitAddon.fit(), false);
+    fitAddon.fit();
   });
+
+  function term(node) {
+    terminal.open(node);
+  }
 
   async function onMessage({ data }) {
     if (typeof data === "object") {
@@ -53,10 +64,6 @@
     connection.send("LIST");
   }
 
-  function send({ detail }) {
-    connection.send(detail);
-  }
-
   function toggleConnection() {
     if (connection.readyState !== 1) {
       error = "Websocket disconnected";
@@ -71,7 +78,8 @@
 </script>
 
 <style>
-  :global(html), :global(body)  {
+  :global(html),
+  :global(body) {
     padding: 0;
     margin: 0;
     min-height: 100%;
@@ -84,6 +92,17 @@
     right: 0;
     padding: 1rem;
   }
+  .workspace {
+    display: flex;
+    position: absolute;
+    top: 52px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+  .workspace > div {
+    flex: 1;
+  }
 </style>
 
 <div class="notification-container">
@@ -92,7 +111,7 @@
   {/if}
 </div>
 
-<nav class="navbar is-dark">
+<nav class="navbar is-dark is-fixed-top">
   <div class="navbar-menu is-active has-background-dark">
     <div class="navbar-start">
       <div class="navbar-item has-text-danger">
@@ -143,5 +162,6 @@
     </div>
   </div>
 </nav>
-
-<XTerm bind:this={terminal} on:data={send} />
+<div class="workspace">
+  <div use:term />
+</div>

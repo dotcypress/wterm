@@ -136,7 +136,7 @@ impl StreamHandler<Message, ProtocolError> for BridgeSession {
                         "CONNECT" => self.connect(ctx, args),
                         "DISCONNECT" => self.disconnect(ctx),
                         "LIST" => self.list(ctx),
-                        _ => ctx.text("ERR: Unsupported command"),
+                        _ => self.send_error(ctx, "Unsupported command"),
                     }
                 } else {
                     ctx.binary(text);
