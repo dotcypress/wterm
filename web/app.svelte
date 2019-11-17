@@ -4,12 +4,14 @@
   import { onMount } from "svelte";
   import * as xterm from "xterm";
   import { FitAddon } from "xterm-addon-fit";
+  import Chart from "./chart.svelte";
 
   const connection = new WebSocket(`ws://${window.location.host}/ws`);
   const terminal = new xterm.default.Terminal();
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
 
+  let chart;
   let baudrate = 19200;
   let portName;
   let ports = [];
@@ -36,8 +38,10 @@
 
   async function onMessage({ data }) {
     if (typeof data === "object") {
-      var buffer = await data.arrayBuffer();
-      terminal.write(new Uint8Array(buffer));
+      const buffer = await data.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      serialHook(bytes);
+      terminal.write(bytes);
       return;
     }
     const [command, ...params] = data.split(" ");
@@ -80,6 +84,20 @@
   function toggleNavbar() {
     navbarOpen = !navbarOpen;
   }
+
+  function clear() {
+    terminal.clear();
+    chart.clear();
+  }
+
+  function serialHook(buffer) {
+    const points = new TextDecoder("utf-8")
+      .decode(buffer)
+      .split("\n")
+      .map(parseFloat)
+      .filter(val => !isNaN(val))
+      .map(val => chart.addPoint({ t: Date.now(), y: val }));
+  }
 </script>
 
 <style>
@@ -109,7 +127,8 @@
   .workspace > div {
     flex: 1;
   }
-  .workspace .navbar button, .workspace .navbar button:focus {
+  .workspace .navbar button,
+  .workspace .navbar button:focus {
     outline: none;
     border: none;
   }
@@ -141,9 +160,7 @@
         <span aria-hidden="true" />
       </button>
     </div>
-    <div
-      class="navbar-menu has-background-dark"
-      class:is-active={navbarOpen}>
+    <div class="navbar-menu has-background-dark" class:is-active={navbarOpen}>
       <div class="navbar-end">
         <div class="navbar-item">
           <div class="select is-small is-fullwidth">
@@ -174,9 +191,7 @@
               on:click={toggleConnection}>
               {connected ? 'Disconnect' : 'Connect'}
             </button>
-            <button
-              class="button is-light is-small"
-              on:click={() => terminal.clear()}>
+            <button class="button is-light is-small" on:click={clear}>
               Clear
             </button>
           </div>
@@ -184,5 +199,6 @@
       </div>
     </div>
   </nav>
+  <Chart bind:this={chart} />
   <div use:term />
 </div>
