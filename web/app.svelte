@@ -48,6 +48,9 @@
     switch (command) {
       case "OK:": {
         connected = params[0] === "UP";
+        if (connected) {
+          navbarOpen = false;
+        }
         error = "";
         break;
       }
