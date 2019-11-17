@@ -7,31 +7,21 @@
 
   export function clear() {
     for (const set of chart.data.datasets) {
-      set.data = []
+      set.data = [];
     }
     chart.update({ duration: 0 });
   }
 
   export function addPoints(points) {
     for (let index = 0; index < points.length; index++) {
-      const data = chart.data.datasets[index].data;
-      data.push(points[index]);
-      while (data.length > maxPoints) {
-        data.shift();
-      }
+      const dataset = chart.data.datasets[index]
+      dataset && dataset.data.push(points[index]);
     }
-
-    chart.update({
-      lazy: true,
-      preservation: true,
-      duration: 100,
-      easing: "linear"
-    });
   }
 
   function graph(node) {
     const ctx = node.getContext("2d");
-    const color = Chart.helpers.color;
+    node.width = node.parentElement.clientWidth;
     const cfg = {
       data: {
         datasets: [
@@ -88,9 +78,13 @@
         ]
       },
       options: {
+        responsive: false,
         legend: {
           display: false,
           position: "bottom"
+        },
+        layout: {
+          padding: { top: 10, right: 0, bottom: 10, left: 0 }
         },
         animation: {
           duration: 0
@@ -102,21 +96,12 @@
               type: "realtime",
               offset: false,
               realtime: {
-                duration: 1000 * 60,
-                delay: 500,
+                duration: maxPoints * 60,
+                delay: 100,
                 pause: false,
-                ttl: undefined
               },
               ticks: {
-                enabled: false,
-                major: {
-                  enabled: false
-                },
-                source: "data",
-                autoSkip: true,
-                autoSkipPadding: 75,
-                maxRotation: 0,
-                sampleSize: 100
+                enabled: false
               }
             }
           ],
@@ -124,7 +109,8 @@
             {
               position: "right",
               gridLines: {
-                drawBorder: true
+                drawBorder: false,
+                drawOnChartArea: false
               },
               scaleLabel: {
                 display: true
@@ -134,7 +120,7 @@
         },
         plugins: {
           streaming: {
-            frameRate: 20
+            frameRate: 30
           }
         },
         tooltips: {
@@ -154,4 +140,6 @@
   }
 </style>
 
-<canvas height="200" use:graph />
+<div>
+  <canvas height="200" width="100" use:graph />
+</div>

@@ -1,7 +1,7 @@
 <script>
   import "xterm/css/xterm.css";
   import "bulma/css/bulma.min.css";
-  import { onMount } from "svelte";
+  import { onMount, afterUpdate } from "svelte";
   import {
     TerminalIcon,
     Trash2Icon,
@@ -38,16 +38,25 @@
     fitAddon.fit();
   });
 
+  afterUpdate(() => {
+    terminal.element.style.height =
+      terminal.element.parentNode.clientHeight + "px";
+    fitAddon.fit();
+  });
+
   function term(node) {
     terminal.open(node);
   }
 
   async function onMessage({ data }) {
     if (typeof data === "object") {
-      const buffer = await data.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      serialHook(bytes);
-      terminal.write(bytes);
+      const reader = new FileReader();
+      reader.addEventListener("loadend", () => {
+        const bytes = new Uint8Array(reader.result);
+        serialHook(bytes);
+        terminal.write(bytes);
+      });
+      reader.readAsArrayBuffer(data);
       return;
     }
     const [command, ...params] = data.split(" ");
@@ -104,13 +113,9 @@
   }
 
   function extractPoints(line) {
-    const matches = line.match(/^(\d+):?(\d+)?:?(\d+)?:?(\d+)?:?(\d+)?/);
-    if (!matches || matches.length < 2) {
-      return [];
-    }
-    const [match, ...groups] = matches;
-    return groups
-      .filter(Boolean)
+    return line
+      .split(/[^.\w]/)
+      .filter(val => val !== "")
       .map(group => ({ t: Date.now(), y: parseFloat(group) }));
   }
 
@@ -150,8 +155,9 @@
     right: 0;
     bottom: 0;
   }
-  .workspace > div {
+  .workspace > .terminal {
     flex: 1;
+    overflow: hidden;
   }
   .workspace .navbar button,
   .workspace .navbar button:focus {
@@ -260,5 +266,5 @@
   {#if chartOpen}
     <Chart bind:this={chart} />
   {/if}
-  <div use:term />
+  <div class="terminal" use:term />
 </div>
