@@ -1,7 +1,12 @@
 <script>
-  import "bulma/css/bulma.css";
   import "xterm/css/xterm.css";
+  import "bulma/css/bulma.min.css";
   import { onMount } from "svelte";
+  import {
+    TerminalIcon,
+    Trash2Icon,
+    BarChart2Icon
+  } from "svelte-feather-icons";
   import * as xterm from "xterm";
   import { FitAddon } from "xterm-addon-fit";
   import Chart from "./chart.svelte";
@@ -19,6 +24,7 @@
   let busy = false;
   let connected = false;
   let navbarOpen = false;
+  let chartOpen = false;
 
   onMount(async () => {
     connection.onopen = onOpen;
@@ -88,18 +94,35 @@
     navbarOpen = !navbarOpen;
   }
 
+  function toggleChart() {
+    chartOpen = !chartOpen;
+  }
+
   function clear() {
     terminal.clear();
     chart.clear();
   }
 
+  function extractPoints(line) {
+    const matches = line.match(/^(\d+):?(\d+)?:?(\d+)?:?(\d+)?:?(\d+)?/);
+    if (!matches || matches.length < 2) {
+      return [];
+    }
+    const [match, ...groups] = matches;
+    return groups
+      .filter(Boolean)
+      .map(group => ({ t: Date.now(), y: parseFloat(group) }));
+  }
+
   function serialHook(buffer) {
-    const points = new TextDecoder("utf-8")
+    if (!chart) {
+      return;
+    }
+    new TextDecoder("utf-8")
       .decode(buffer)
       .split("\n")
-      .map(parseFloat)
-      .filter(val => !isNaN(val))
-      .map(val => chart.addPoint({ t: Date.now(), y: val }));
+      .map(extractPoints)
+      .map(points => chart.addPoints(points));
   }
 </script>
 
@@ -135,6 +158,9 @@
     outline: none;
     border: none;
   }
+  .workspace .navbar .navbar-item input {
+    max-width: 62px;
+  }
 </style>
 
 <div class="notification-container">
@@ -148,9 +174,12 @@
     <div class="navbar-brand">
       <div class="navbar-item">
         <span
-          class="tag is-info is-light is-family-code is-size-6
-          has-text-weight-bold">
-          wterm
+          class="tag is-info is-family-code is-size-6 has-text-weight-bold"
+          class:is-danger={connected}>
+          <span class="icon is-small">
+            <TerminalIcon />
+          </span>
+          &nbsp; wterm
         </span>
       </div>
       <button
@@ -164,44 +193,72 @@
       </button>
     </div>
     <div class="navbar-menu has-background-dark" class:is-active={navbarOpen}>
+      <div class="navbar-start">
+        <div class="navbar-item">
+          <div class="buttons are-small">
+            <button
+              class="button is-small is-warning"
+              title="Show graph"
+              class:is-active={chartOpen}
+              class:is-outlined={!chartOpen}
+              on:click={toggleChart}>
+              <span class="icon is-small">
+                <BarChart2Icon />
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="navbar-end">
         <div class="navbar-item">
-          <div class="select is-small is-fullwidth">
-            <select bind:value={portName} disabled={busy || connected}>
-              {#each ports as port}
-                <option value={port}>{port}</option>
-              {/each}
-            </select>
+          <div class="field has-addons">
+            <div class="control">
+              <div class="select is-small">
+                <select bind:value={portName} disabled={busy || connected}>
+                  {#each ports as port}
+                    <option value={port}>{port}</option>
+                  {/each}
+                </select>
+              </div>
+            </div>
+            <p class="control">
+              <input
+                class="input is-small"
+                type="text"
+                placeholder="Baudrate"
+                bind:value={baudrate}
+                disabled={busy || connected} />
+            </p>
+            <p class="control">
+              <button
+                class="button is-small"
+                class:is-loading={busy}
+                class:is-primary={!connected}
+                class:is-danger={connected}
+                disabled={busy}
+                on:click={toggleConnection}>
+                {connected ? 'Disconnect' : 'Connect'}
+              </button>
+            </p>
           </div>
         </div>
         <div class="navbar-item">
-          <input
-            class="input is-small"
-            type="text"
-            placeholder="Baudrate"
-            bind:value={baudrate}
-            disabled={busy || connected} />
-        </div>
-
-        <div class="navbar-item">
-          <div class="buttons">
+          <div class="buttons are-small">
             <button
-              class="button is-small"
-              class:is-loading={busy}
-              class:is-primary={!connected}
-              class:is-danger={connected}
-              disabled={busy}
-              on:click={toggleConnection}>
-              {connected ? 'Disconnect' : 'Connect'}
-            </button>
-            <button class="button is-light is-small" on:click={clear}>
-              Clear
+              class="button is-danger is-small is-light"
+              title="Clear"
+              on:click={clear}>
+              <span class="icon is-small">
+                <Trash2Icon />
+              </span>
             </button>
           </div>
         </div>
       </div>
     </div>
   </nav>
-  <Chart bind:this={chart} />
+  {#if chartOpen}
+    <Chart bind:this={chart} />
+  {/if}
   <div use:term />
 </div>

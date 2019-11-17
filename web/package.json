@@ -14,7 +14,9 @@
   "dependencies": {
     "bulma": "^0.8.0",
     "chart.js": "^2.9.3",
+    "chartjs-plugin-streaming": "^1.8.0",
     "svelte": "^3.1.0",
+    "svelte-feather-icons": "^2.0.0",
     "xterm": "^4.2.0",
     "xterm-addon-fit": "^0.3.0"
   },
