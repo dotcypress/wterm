@@ -5,6 +5,7 @@
   import {
     TerminalIcon,
     Trash2Icon,
+    RefreshCwIcon,
     BarChart2Icon
   } from "svelte-feather-icons";
   import * as xterm from "xterm";
@@ -84,6 +85,10 @@
 
   function onOpen() {
     connection.send("STATUS");
+    reloadPorts();
+  }
+  
+  function reloadPorts() {
     connection.send("LIST");
   }
 
@@ -218,6 +223,16 @@
       <div class="navbar-end">
         <div class="navbar-item">
           <div class="field has-addons">
+            <p class="control">
+              <button
+              class="button is-small"
+              title="Reload"
+              on:click={reloadPorts}>
+              <span class="icon is-small">
+                <RefreshCwIcon />
+              </span>
+            </button>
+            </p>
             <div class="control">
               <div class="select is-small">
                 <select bind:value={portName} disabled={busy || connected}>
@@ -227,6 +242,7 @@
                 </select>
               </div>
             </div>
+             
             <p class="control">
               <input
                 class="input is-small"
