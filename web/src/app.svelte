@@ -87,7 +87,7 @@
     connection.send("STATUS");
     reloadPorts();
   }
-  
+
   function reloadPorts() {
     connection.send("LIST");
   }
@@ -225,13 +225,13 @@
           <div class="field has-addons">
             <p class="control">
               <button
-              class="button is-small"
-              title="Reload"
-              on:click={reloadPorts}>
-              <span class="icon is-small">
-                <RefreshCwIcon />
-              </span>
-            </button>
+                class="button is-small"
+                title="Reload"
+                on:click={reloadPorts}>
+                <span class="icon is-small">
+                  <RefreshCwIcon />
+                </span>
+              </button>
             </p>
             <div class="control">
               <div class="select is-small">
@@ -242,7 +242,6 @@
                 </select>
               </div>
             </div>
-             
             <p class="control">
               <input
                 class="input is-small"

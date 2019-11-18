@@ -40,8 +40,8 @@ fn index(req: HttpRequest) -> Result<NamedFile> {
 fn index(req: HttpRequest) -> HttpResponse {
     static ICON: &'static [u8] = include_bytes!("./../static/favicon.png");
     static HOME: &'static str = include_str!("./../static/index.html");
-    static CSS: &'static str = include_str!("./../static/wterm.css");
-    static JS: &'static str = include_str!("./../static/wterm.js");
+    static CSS: &'static str = include_str!("./../static/app.css");
+    static JS: &'static str = include_str!("./../static/app.js");
 
     let filename = req
         .match_info()
@@ -53,10 +53,10 @@ fn index(req: HttpRequest) -> HttpResponse {
         "" | "index.html" => HttpResponse::Ok()
             .content_type("text/html; charset=utf-8")
             .body(HOME),
-        "wterm.js" => HttpResponse::Ok()
+        "app.js" => HttpResponse::Ok()
             .content_type("text/javascript; charset=utf-8")
             .body(JS),
-        "wterm.css" => HttpResponse::Ok().content_type("text/css").body(CSS),
+        "app.css" => HttpResponse::Ok().content_type("text/css").body(CSS),
         "favicon.png" => HttpResponse::Ok().content_type("image/png").body(ICON),
         _ => HttpResponse::NotFound().finish(),
     }

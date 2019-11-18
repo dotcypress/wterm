@@ -1,20 +1,31 @@
 <script>
+  import { onDestroy } from "svelte";
   import Chart from "chart.js";
   import "chartjs-plugin-streaming";
 
-  export let maxPoints = 1000;
   let chart;
+  let speed = 60;
+
+  onDestroy(() => {
+    chart.destroy();
+  });
 
   export function clear() {
     for (const set of chart.data.datasets) {
       set.data = [];
     }
-    chart.update({ duration: 0 });
+    chart.update({ preservation: true });
+  }
+
+  $: {
+    if (chart) {
+      chart.options.scales.xAxes[0].realtime.duration = parseInt(speed) * 1000;
+    }
   }
 
   export function addPoints(points) {
     for (let index = 0; index < points.length; index++) {
-      const dataset = chart.data.datasets[index]
+      const dataset = chart.data.datasets[index];
       dataset && dataset.data.push(points[index]);
     }
   }
@@ -32,8 +43,8 @@
             fill: false,
             spanGaps: true,
             borderWidth: 1,
-            pointRadius: 1,
-            lineTension: 0.05
+            pointRadius: 0,
+            lineTension: 0.07
           },
           {
             type: "line",
@@ -42,8 +53,8 @@
             fill: false,
             spanGaps: true,
             borderWidth: 1,
-            pointRadius: 1,
-            lineTension: 0.05
+            pointRadius: 0,
+            lineTension: 0.07
           },
           {
             type: "line",
@@ -52,8 +63,8 @@
             fill: false,
             spanGaps: true,
             borderWidth: 1,
-            pointRadius: 1,
-            lineTension: 0.05
+            pointRadius: 0,
+            lineTension: 0.07
           },
           {
             type: "line",
@@ -62,8 +73,8 @@
             fill: false,
             spanGaps: true,
             borderWidth: 1,
-            pointRadius: 1,
-            lineTension: 0.05
+            pointRadius: 0,
+            lineTension: 0.07
           },
           {
             type: "line",
@@ -72,8 +83,8 @@
             fill: false,
             spanGaps: true,
             borderWidth: 1,
-            pointRadius: 1,
-            lineTension: 0.05
+            pointRadius: 0,
+            lineTension: 0.07
           }
         ]
       },
@@ -96,9 +107,9 @@
               type: "realtime",
               offset: false,
               realtime: {
-                duration: maxPoints * 60,
+                duration: speed,
                 delay: 100,
-                pause: false,
+                pause: false
               },
               ticks: {
                 enabled: false
@@ -135,11 +146,35 @@
 </script>
 
 <style>
+  .graph-pane {
+    position: relative;
+  }
+  .settings {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+  }
   canvas {
     border-bottom: 1px dashed hsl(0, 0%, 17%);
   }
 </style>
 
-<div>
+<div class="graph-pane">
+  <div class="settings">
+    <div class="field">
+      <div class="control">
+        <div class="select is-small is-warning">
+          <select
+            class="has-text-warning has-background-black-bis"
+            bind:value={speed}>
+            <option value="30">History: 30 sec</option>
+            <option value="60">History: 1 min</option>
+            <option value="300">History: 5 min</option>
+            <option value="900">History: 15 min</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
   <canvas height="200" width="100" use:graph />
 </div>
