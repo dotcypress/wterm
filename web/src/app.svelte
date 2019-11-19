@@ -121,7 +121,7 @@
     return line
       .split(/[^.\w]/)
       .filter(val => val !== "")
-      .map(group => ({ t: Date.now(), y: parseFloat(group) }));
+      .map(parseFloat);
   }
 
   function serialHook(buffer) {
@@ -149,7 +149,7 @@
     z-index: 1;
     bottom: 0;
     right: 0;
-    padding: 1rem;
+    padding: 1em;
   }
   .workspace {
     display: flex;
