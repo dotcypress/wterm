@@ -15,5 +15,8 @@ actix-web = "1.0"
 actix-files = "0.1.7"
 actix-web-actors = "1.0.2"
 bytes = "0.4.12"
-serialport = "3.3.0"
+serialport = { version = "3.3.0", default-features = false }
 structopt = "0.3.4"
+
+[features]
+libudev = ["serialport/libudev"]
