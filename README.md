@@ -1,6 +1,6 @@
 # wterm
 
-Serial port to WebSocket bridge with embedded web terminal.
+Serial port to WebSocket bridge with embedded web terminal written in Rust.
 
 ## Installation
 
