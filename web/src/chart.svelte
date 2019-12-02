@@ -1,28 +1,33 @@
 <script>
   import Smoothie from "smoothie";
   const CHART_COLORS = [
-    "hsl(48, 100%, 67%)",
-    "hsl(204, 86%, 53%)",
-    "hsl(141, 71%, 48%)",
-    "hsl(348, 100%, 61%)",
-    "hsl(0, 0%, 96%)"
+    "#ff3860",
+    "#22d15f",
+    "#1f9cee",
+    "#f5f5f5",
+    "#ffdd56",
+    "#ea80fc",
+    "#ff5722",
+    "#69f0ae",
+    "#b388ff",
+    "#76ff03"
   ];
 
   const { TimeSeries, SmoothieChart } = Smoothie;
   const chart = new SmoothieChart({
-    millisPerPixel: 100,
-    limitFPS:15,
+    millisPerPixel: 50,
+    limitFPS: 20,
     grid: {
-      strokeStyle: "hsl(0, 0%, 17%)",
+      strokeStyle: "#2b2b2b",
       borderVisible: false,
-      millisPerLine: 10000,
-      verticalSections: 3
+      millisPerLine: 5000,
+      verticalSections: 4
     },
     tooltip: true
   });
   const series = [];
 
-  for (let index = 0; index < 5; index++) {
+  for (let index = 0; index < 10; index++) {
     const ds = new TimeSeries();
     series.push(ds);
     chart.addTimeSeries(ds, {
@@ -31,16 +36,43 @@
     });
   }
 
+  let decoder = new TextDecoder("utf-8");
+  let accumulator = "";
+
   export function clear() {
     for (const ds of series) {
       ds.clear();
     }
+    decoder = new TextDecoder("utf-8");
+    accumulator = "";
   }
 
-  export function addPoints(points) {
-    for (let index = 0; index < points.length; index++) {
-      const ds = series[index];
-      ds && ds.append(Date.now(), points[index]);
+  export function pushData(buffer) {
+    accumulator += decoder.decode(buffer, { stream: true });
+    extractPoints();
+  }
+
+  function* readLine() {
+    while (true) {
+      const index = accumulator.indexOf("\n");
+      if (index < 0) {
+        return;
+      }
+      yield accumulator.slice(0, index + 1);
+      accumulator = accumulator.slice(index + 1);
+    }
+  }
+
+  function extractPoints() {
+    for (const line of readLine()) {
+      const points = line
+        .split(/[^.\w]/)
+        .map(parseFloat)
+        .filter(Boolean);
+      for (let index = 0; index < points.length; index++) {
+        const ds = series[index];
+        ds && ds.append(Date.now(), points[index]);
+      }
     }
   }
 
@@ -52,7 +84,7 @@
 
 <style>
   canvas {
-    border-bottom: 1px dashed hsl(0, 0%, 17%);
+    border-bottom: 1px dashed #2b2b2b;
   }
   :global(div.smoothie-chart-tooltip) {
     background: #363636;
@@ -65,5 +97,5 @@
 </style>
 
 <div class="graph-pane">
-  <canvas height="200" width="200" use:graph />
+  <canvas height="250" width="400" use:graph />
 </div>

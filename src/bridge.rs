@@ -91,17 +91,18 @@ impl BridgeSession {
             }
         };
     }
+
     fn poll_serial(&mut self, ctx: &mut WebsocketContext<BridgeSession>) {
         if let BridgeStatus::Connected(port) = &mut self.status {
             while let Ok(len) = port.bytes_to_read() {
                 if len == 0 {
                     break;
                 }
-                let mut buff = [0u8; 32 * 1024];
+                let mut buff = [0u8; 64 * 1024];
                 match port.read(&mut buff) {
-                    Ok(_) => {
+                    Ok(n) => {
                         let mut data = Bytes::new();
-                        data.extend_from_slice(&buff[..len as usize]);
+                        data.extend_from_slice(&buff[..n]);
                         ctx.binary(data);
                     }
                     Err(err) => {

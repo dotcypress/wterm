@@ -12,11 +12,11 @@
   import { FitAddon } from "xterm-addon-fit";
   import Chart from "./chart.svelte";
 
-  const connection = new WebSocket(`ws://${window.location.host}/ws`);
   const terminal = new xterm.default.Terminal();
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
 
+  let connection;
   let chart;
   let baudrate = 19200;
   let portName;
@@ -28,13 +28,7 @@
   let chartOpen = false;
 
   onMount(async () => {
-    connection.onopen = onOpen;
-    connection.onclose = () => {
-      connected = false;
-      error = "";
-    };
-    connection.onmessage = onMessage;
-    terminal.onData(data => connection.send(new Blob([data])));
+    connect();
     window.addEventListener("resize", () => fitAddon.fit(), false);
     fitAddon.fit();
   });
@@ -44,6 +38,18 @@
       terminal.element.parentNode.clientHeight + "px";
     fitAddon.fit();
   });
+
+  function connect() {
+    connection = new WebSocket(`ws://${window.location.host}/ws`);
+    connection.onopen = onOpen;
+    connection.onclose = () => {
+      connected = false;
+      error = "Websocket closed. Reconnecting...";
+      setTimeout(connect, 700);
+    };
+    connection.onmessage = onMessage;
+    terminal.onData(data => connected && connection.send(new Blob([data])));
+  }
 
   function term(node) {
     terminal.open(node);
@@ -94,7 +100,8 @@
 
   function toggleConnection() {
     if (connection.readyState !== 1) {
-      error = "Websocket disconnected";
+      error = "Websocket closed. Reconnecting...";
+      setTimeout(connect, 700);
       return;
     }
     busy = true;
@@ -114,25 +121,11 @@
 
   function clear() {
     terminal.clear();
-    chart.clear();
-  }
-
-  function extractPoints(line) {
-    return line
-      .split(/[^.\w]/)
-      .filter(val => val !== "")
-      .map(parseFloat);
+    chart && chart.clear();
   }
 
   function serialHook(buffer) {
-    if (!chart) {
-      return;
-    }
-    new TextDecoder("utf-8")
-      .decode(buffer)
-      .split("\n")
-      .map(extractPoints)
-      .map(points => chart.addPoints(points));
+    chart && chart.pushData(buffer);
   }
 </script>
 
@@ -208,13 +201,20 @@
         <div class="navbar-item">
           <div class="buttons are-small">
             <button
-              class="button is-small is-warning"
-              title="Show graph"
-              class:is-active={chartOpen}
-              class:is-outlined={!chartOpen}
+              class="button is-small is-warning is-outlined"
+              title="Toggle graph"
+              class:is-light={chartOpen}
               on:click={toggleChart}>
               <span class="icon is-small">
                 <BarChart2Icon />
+              </span>
+            </button>
+            <button
+              class="button is-small is-danger is-outlined"
+              title="Clear"
+              on:click={clear}>
+              <span class="icon is-small">
+                <Trash2Icon />
               </span>
             </button>
           </div>
@@ -261,18 +261,6 @@
                 {connected ? 'Disconnect' : 'Connect'}
               </button>
             </p>
-          </div>
-        </div>
-        <div class="navbar-item">
-          <div class="buttons are-small">
-            <button
-              class="button is-danger is-small is-light"
-              title="Clear"
-              on:click={clear}>
-              <span class="icon is-small">
-                <Trash2Icon />
-              </span>
-            </button>
           </div>
         </div>
       </div>

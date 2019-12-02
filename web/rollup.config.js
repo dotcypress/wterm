@@ -23,6 +23,8 @@ export default {
     postcss(),
     resolve({ browser: true }),
     commonjs(),
-    production && terser()
+    production && terser({
+      safari10: true
+    })
   ]
 }
