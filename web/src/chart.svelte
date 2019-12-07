@@ -16,17 +16,19 @@
   const { TimeSeries, SmoothieChart } = Smoothie;
   const chart = new SmoothieChart({
     millisPerPixel: 50,
-    limitFPS: 20,
     grid: {
-      strokeStyle: "#2b2b2b",
+      strokeStyle: "#202020",
       borderVisible: false,
       millisPerLine: 5000,
-      verticalSections: 4
+      verticalSections: 4,
+      sharpLines: true
     },
     tooltip: true
   });
-  const series = [];
 
+  $: chart.options.millisPerPixel = (7 - speed) * 15 + 5;
+
+  const series = [];
   for (let index = 0; index < 10; index++) {
     const ds = new TimeSeries();
     series.push(ds);
@@ -36,6 +38,7 @@
     });
   }
 
+  let speed = 4;
   let decoder = new TextDecoder("utf-8");
   let accumulator = "";
 
@@ -63,6 +66,11 @@
     }
   }
 
+  function pushPoints(index, point) {
+    const ds = series[index];
+    ds && ds.append(Date.now(), point);
+  }
+
   function extractPoints() {
     for (const line of readLine()) {
       const points = line
@@ -70,21 +78,20 @@
         .map(parseFloat)
         .filter(Boolean);
       for (let index = 0; index < points.length; index++) {
-        const ds = series[index];
-        ds && ds.append(Date.now(), points[index]);
+        pushPoints(index, points[index]);
       }
     }
   }
 
   function graph(node) {
-    chart.streamTo(node, 500);
+    chart.streamTo(node, 300);
     node.width = node.parentElement.clientWidth;
   }
 </script>
 
 <style>
   canvas {
-    border-bottom: 1px dashed #2b2b2b;
+    border-bottom: 1px dashed #202020;
   }
   :global(div.smoothie-chart-tooltip) {
     background: #363636;
@@ -94,8 +101,27 @@
     font-size: 10px;
     pointer-events: none;
   }
+  .graph-pane {
+    position: relative;
+  }
+  .graph-pane .select {
+    position: absolute;
+    left: 8px;
+    bottom: 16px;
+  }
 </style>
 
 <div class="graph-pane">
   <canvas height="250" width="400" use:graph />
+  <div class="select is-small">
+    <select bind:value={speed}>
+      <option value={1}>Speed: 1</option>
+      <option value={2}>Speed: 2</option>
+      <option value={3}>Speed: 3</option>
+      <option value={4}>Speed: 4</option>
+      <option value={5}>Speed: 5</option>
+      <option value={6}>Speed: 6</option>
+      <option value={7}>Speed: 7</option>
+    </select>
+  </div>
 </div>
