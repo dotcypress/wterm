@@ -1,5 +1,14 @@
 <script>
   import Smoothie from "smoothie";
+  const CHART_SPEEDS = [
+    { name: "Slow", value: 333 },
+    { name: "Moderate", value: 100 },
+    { name: "Normal", value: 50 },
+    { name: "Quick", value: 25 },
+    { name: "Fast", value: 10 },
+    { name: "Brief", value: 5 }
+  ];
+
   const CHART_COLORS = [
     "#ff3860",
     "#22d15f",
@@ -13,20 +22,28 @@
     "#76ff03"
   ];
 
+  let speed = 2;
+  let decoder = new TextDecoder("utf-8");
+  let accumulator = "";
+
   const { TimeSeries, SmoothieChart } = Smoothie;
   const chart = new SmoothieChart({
-    millisPerPixel: 50,
+    millisPerPixel: CHART_SPEEDS[speed].value,
+    limitFPS: 40,
+    tooltip: true,
     grid: {
       strokeStyle: "#202020",
       borderVisible: false,
-      millisPerLine: 5000,
+      millisPerLine: CHART_SPEEDS[speed].value * 100,
       verticalSections: 4,
       sharpLines: true
-    },
-    tooltip: true
+    }
   });
 
-  $: chart.options.millisPerPixel = (7 - speed) * 15 + 5;
+  $: {
+    chart.options.grid.millisPerLine = CHART_SPEEDS[speed].value * 100;
+    chart.options.millisPerPixel = CHART_SPEEDS[speed].value;
+  }
 
   const series = [];
   for (let index = 0; index < 10; index++) {
@@ -37,10 +54,6 @@
       lineWidth: 2
     });
   }
-
-  let speed = 4;
-  let decoder = new TextDecoder("utf-8");
-  let accumulator = "";
 
   export function clear() {
     for (const ds of series) {
@@ -55,6 +68,11 @@
     extractPoints();
   }
 
+  function pushPoints(index, point) {
+    const ds = series[index];
+    ds && ds.append(Date.now(), point);
+  }
+
   function* readLine() {
     while (true) {
       const index = accumulator.indexOf("\n");
@@ -64,11 +82,6 @@
       yield accumulator.slice(0, index + 1);
       accumulator = accumulator.slice(index + 1);
     }
-  }
-
-  function pushPoints(index, point) {
-    const ds = series[index];
-    ds && ds.append(Date.now(), point);
   }
 
   function extractPoints() {
@@ -115,13 +128,9 @@
   <canvas height="250" width="400" use:graph />
   <div class="select is-small">
     <select bind:value={speed}>
-      <option value={1}>Speed: 1</option>
-      <option value={2}>Speed: 2</option>
-      <option value={3}>Speed: 3</option>
-      <option value={4}>Speed: 4</option>
-      <option value={5}>Speed: 5</option>
-      <option value={6}>Speed: 6</option>
-      <option value={7}>Speed: 7</option>
+      {#each CHART_SPEEDS as speed, i}
+        <option value={i}>{speed.name}</option>
+      {/each}
     </select>
   </div>
 </div>

@@ -25,7 +25,7 @@
   let busy = false;
   let connected = false;
   let navbarOpen = false;
-  let chartOpen = false;
+  let chartOpen = true;
 
   onMount(async () => {
     connect();
