@@ -6,7 +6,8 @@
     TerminalIcon,
     Trash2Icon,
     RefreshCwIcon,
-    BarChart2Icon
+    BarChart2Icon,
+    CornerDownLeftIcon
   } from "svelte-feather-icons";
   import * as xterm from "xterm";
   import { FitAddon } from "xterm-addon-fit";
@@ -18,14 +19,15 @@
 
   let connection;
   let chart;
-  let baudrate = 19200;
   let portName;
+  let baudrate = localStorage.getItem("baudrate") || 115200;
   let ports = [];
   let error = "";
   let busy = false;
   let connected = false;
   let navbarOpen = false;
   let chartOpen = false;
+  let convertEol = false;
 
   onMount(async () => {
     connect();
@@ -48,7 +50,12 @@
       setTimeout(connect, 700);
     };
     connection.onmessage = onMessage;
-    terminal.onData(data => connected && connection.send(new Blob([data])));
+    terminal.onData(data => {
+      if (convertEol) {
+        data = data.replace(/\r/, "\r\n");
+      }
+      connected && connection.send(new Blob([data]));
+    });
   }
 
   function term(node) {
@@ -81,8 +88,8 @@
         break;
       }
       case "LIST:": {
-        portName = params[0];
         ports = params;
+        portName = localStorage.getItem("portName") || params[0];
         break;
       }
     }
@@ -104,6 +111,9 @@
       setTimeout(connect, 700);
       return;
     }
+    console.log(portName);
+    localStorage.setItem("portName", portName);
+    localStorage.setItem("baudrate", baudrate);
     busy = true;
     error = "";
     connected
@@ -119,8 +129,12 @@
     chartOpen = !chartOpen;
   }
 
+  function toggleEol() {
+    convertEol = !convertEol;
+  }
+
   function clear() {
-    terminal.clear();
+    terminal.reset();
     chart && chart.clear();
   }
 
@@ -200,6 +214,15 @@
       <div class="navbar-start">
         <div class="navbar-item">
           <div class="buttons are-small">
+            <button
+              class="button is-small is-primary is-outlined"
+              title="Auto EOL"
+              class:is-light={convertEol}
+              on:click={toggleEol}>
+              <span class="icon is-small">
+                <CornerDownLeftIcon />
+              </span>
+            </button>
             <button
               class="button is-small is-warning is-outlined"
               title="Toggle graph"

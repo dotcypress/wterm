@@ -1,5 +1,6 @@
 <script>
   import Smoothie from "smoothie";
+
   const CHART_SPEEDS = [
     { name: "Slow", value: 333 },
     { name: "Moderate", value: 100 },
