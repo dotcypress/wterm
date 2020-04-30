@@ -7,6 +7,7 @@
     Trash2Icon,
     RefreshCwIcon,
     BarChart2Icon,
+    SaveIcon,
     CornerDownLeftIcon
   } from "svelte-feather-icons";
   import * as xterm from "xterm";
@@ -28,6 +29,8 @@
   let navbarOpen = false;
   let chartOpen = false;
   let convertEol = false;
+  let decoder = new TextDecoder("utf-8");
+  let log = "";
 
   onMount(async () => {
     connect();
@@ -69,6 +72,7 @@
         const bytes = new Uint8Array(reader.result);
         serialHook(bytes);
         terminal.write(bytes);
+        log += decoder.decode(bytes);
       });
       reader.readAsArrayBuffer(data);
       return;
@@ -111,7 +115,6 @@
       setTimeout(connect, 700);
       return;
     }
-    console.log(portName);
     localStorage.setItem("portName", portName);
     localStorage.setItem("baudrate", baudrate);
     busy = true;
@@ -134,8 +137,29 @@
   }
 
   function clear() {
+    log = "";
+    decoder = new TextDecoder("utf-8");
     terminal.reset();
     chart && chart.clear();
+  }
+
+  function downloadLog() {
+    const blob = new Blob([log], {
+      type: "text/plain;charset=utf-8;"
+    });
+
+    const a = document.createElement("a");
+    a.download = `serial-session-${new Date().toISOString()}.log`;
+    a.href = URL.createObjectURL(blob);
+    a.dataset.downloadurl = [
+      "text/plain;charset=utf-8;",
+      a.download,
+      a.href
+    ].join(":");
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   function serialHook(buffer) {
@@ -216,20 +240,10 @@
           <div class="buttons are-small">
             <button
               class="button is-small is-primary is-outlined"
-              title="Auto EOL"
-              class:is-light={convertEol}
-              on:click={toggleEol}>
+              title="Download log"
+              on:click={downloadLog}>
               <span class="icon is-small">
-                <CornerDownLeftIcon />
-              </span>
-            </button>
-            <button
-              class="button is-small is-warning is-outlined"
-              title="Toggle graph"
-              class:is-light={chartOpen}
-              on:click={toggleChart}>
-              <span class="icon is-small">
-                <BarChart2Icon />
+                <SaveIcon />
               </span>
             </button>
             <button
@@ -245,11 +259,34 @@
       </div>
       <div class="navbar-end">
         <div class="navbar-item">
+          <div class="buttons are-small">
+            <button
+              class="button is-small is-warning is-outlined"
+              title="Toggle graph"
+              class:is-light={chartOpen}
+              on:click={toggleChart}>
+              <span class="icon is-small">
+                <BarChart2Icon />
+              </span>
+            </button>
+            <button
+              class="button is-small is-primary is-outlined"
+              title="Auto EOL"
+              class:is-light={convertEol}
+              on:click={toggleEol}>
+              <span class="icon is-small">
+                <CornerDownLeftIcon />
+              </span>
+            </button>
+          </div>
+        </div>
+        <div class="navbar-item">
           <div class="field has-addons">
             <p class="control">
               <button
                 class="button is-small"
                 title="Reload"
+                disabled={connected}
                 on:click={reloadPorts}>
                 <span class="icon is-small">
                   <RefreshCwIcon />
@@ -277,7 +314,7 @@
               <button
                 class="button is-small"
                 class:is-loading={busy}
-                class:is-primary={!connected}
+                class:is-success={!connected}
                 class:is-danger={connected}
                 disabled={busy}
                 on:click={toggleConnection}>
