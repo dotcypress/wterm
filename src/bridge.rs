@@ -44,7 +44,7 @@ impl BridgeSession {
 
     fn list(&self, ctx: &mut WebsocketContext<Self>) {
         let ports: Vec<String> = serialport::available_ports()
-            .unwrap()
+            .unwrap_or_default()
             .into_iter()
             .map(|port| port.port_name)
             .collect();

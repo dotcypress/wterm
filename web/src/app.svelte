@@ -200,7 +200,10 @@
     outline: none;
     border: none;
   }
-  .workspace .navbar .navbar-item input {
+  .workspace .navbar .navbar-item input.port {
+    min-width: 200px;
+  }
+  .workspace .navbar .navbar-item input.baudrate {
     max-width: 62px;
   }
 </style>
@@ -294,17 +297,19 @@
               </button>
             </p>
             <div class="control">
-              <div class="select is-small">
-                <select bind:value={portName} disabled={busy || connected}>
+                <input class="input is-small port"
+                  list="ports"
+                  bind:value={portName}
+                  disabled={busy || connected}>
+                <datalist id="ports">
                   {#each ports as port}
-                    <option value={port}>{port}</option>
+                    <option value={port}>
                   {/each}
-                </select>
-              </div>
+                </datalist>
             </div>
             <p class="control">
               <input
-                class="input is-small"
+                class="input is-small baudrate"
                 type="text"
                 placeholder="Baudrate"
                 bind:value={baudrate}
