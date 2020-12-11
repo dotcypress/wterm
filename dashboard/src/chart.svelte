@@ -1,5 +1,6 @@
 <script>
   import Smoothie from "smoothie";
+  import { SettingsIcon } from "svelte-feather-icons";
 
   const CHART_SPEEDS = [
     { name: "Slow", value: 333 },
@@ -10,27 +11,35 @@
     { name: "Brief", value: 5 }
   ];
 
-  const CHART_COLORS = [
-    "#ff3860",
-    "#22d15f",
-    "#1f9cee",
-    "#f5f5f5",
-    "#ffdd56",
-    "#ea80fc",
-    "#ff5722",
-    "#69f0ae",
-    "#b388ff",
-    "#76ff03"
-  ];
+  const LEGEND = {
+    colors: [
+      "#ff3860",
+      "#22d15f",
+      "#1f9cee",
+      "#f5f5f5",
+      "#ffdd56",
+      "#ea80fc",
+      "#ff5722",
+      "#69f0ae",
+      "#b388ff",
+      "#76ff03"
+    ],
+    lineWidth: 2
+  };
 
   let speed = 2;
   let decoder = new TextDecoder("utf-8");
   let accumulator = "";
+  let settingsOpen = true;
+  let extractPoints = line =>
+    line
+      .split(/[^.\w]/)
+      .map(parseFloat)
+      .filter(Boolean);
 
   const { TimeSeries, SmoothieChart } = Smoothie;
   const chart = new SmoothieChart({
     millisPerPixel: CHART_SPEEDS[speed].value,
-    limitFPS: 40,
     tooltip: true,
     grid: {
       strokeStyle: "#202020",
@@ -47,12 +56,12 @@
   }
 
   const series = [];
-  for (let index = 0; index < 10; index++) {
+  for (let index = 0; index < LEGEND.colors.length; index++) {
     const ds = new TimeSeries();
     series.push(ds);
     chart.addTimeSeries(ds, {
-      strokeStyle: CHART_COLORS[index],
-      lineWidth: 2
+      strokeStyle: LEGEND.colors[index],
+      lineWidth: LEGEND.lineWidth
     });
   }
 
@@ -66,7 +75,12 @@
 
   export function pushData(buffer) {
     accumulator += decoder.decode(buffer, { stream: true });
-    extractPoints();
+    for (const line of readLine()) {
+      const points = extractPoints(line);
+      for (let index = 0; index < points.length; index++) {
+        pushPoints(index, points[index]);
+      }
+    }
   }
 
   function pushPoints(index, point) {
@@ -85,16 +99,12 @@
     }
   }
 
-  function extractPoints() {
-    for (const line of readLine()) {
-      const points = line
-        .split(/[^.\w]/)
-        .map(parseFloat)
-        .filter(Boolean);
-      for (let index = 0; index < points.length; index++) {
-        pushPoints(index, points[index]);
-      }
-    }
+  function openSettings() {
+    settingsOpen = true;
+  }
+
+  function closeSettings() {
+    settingsOpen = false;
   }
 
   function graph(node) {
@@ -118,20 +128,48 @@
   .graph-pane {
     position: relative;
   }
-  .graph-pane .select {
+  .graph-pane .button {
     position: absolute;
     left: 8px;
-    bottom: 16px;
+    top: 8px;
+  }
+  .modal-background {
+    background-color: rgba(10,10,10,.4);;
   }
 </style>
 
 <div class="graph-pane">
   <canvas height="250" width="400" use:graph />
-  <div class="select is-small">
-    <select bind:value={speed}>
-      {#each CHART_SPEEDS as speed, i}
-        <option value={i}>{speed.name}</option>
-      {/each}
-    </select>
+  <button
+    class="button is-small is-primary is-outlined"
+    title="Graph Settings"
+    on:click={openSettings}>
+    <span class="icon is-small">
+      <SettingsIcon />
+    </span>
+  </button>
+  <div class="modal" class:is-active={settingsOpen}>
+    <div class="modal-background" />
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title">Graph Settings</p>
+        <button class="delete" aria-label="close" on:click={closeSettings} />
+      </header>
+      <section class="modal-card-body">
+        <div class="field">
+          <label class="label">Chart speed</label>
+          <div class="control">
+            <div class="select">
+              <select bind:value={speed}>
+                {#each CHART_SPEEDS as speed, i}
+                  <option value={i}>{speed.name}</option>
+                {/each}
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+      <footer class="modal-card-foot" />
+    </div>
   </div>
 </div>
