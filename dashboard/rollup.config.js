@@ -12,13 +12,13 @@ export default {
     sourcemap: !production,
     format: 'iife',
     name: 'wte',
-    file: '../static/app.js'
+    file: '../static/wterm.js'
   },
   external: [],
   plugins: [
     svelte({
-      dev: !production,
-      css: (css) => css.write('../static/app.css', false)
+      emitCss: true,
+      compilerOptions: { dev: !production }
     }),
     postcss(),
     resolve({ browser: true }),
