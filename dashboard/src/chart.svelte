@@ -27,15 +27,13 @@
     lineWidth: 2
   };
 
-  let speed = 2;
+  const DefaultExtractRegExp = "[.\\d]+";
+  let pointExtractRegEx = new RegExp(DefaultExtractRegExp, "gi");
+  let regExpError = null;
   let decoder = new TextDecoder("utf-8");
   let accumulator = "";
-  let settingsOpen = true;
-  let extractPoints = line =>
-    line
-      .split(/[^.\w]/)
-      .map(parseFloat)
-      .filter(Boolean);
+  let settingsOpen = false;
+  let speed = 2;
 
   const { TimeSeries, SmoothieChart } = Smoothie;
   const chart = new SmoothieChart({
@@ -76,7 +74,18 @@
   export function pushData(buffer) {
     accumulator += decoder.decode(buffer, { stream: true });
     for (const line of readLine()) {
-      const points = extractPoints(line);
+      const points = [...line.matchAll(pointExtractRegEx)]
+        .map(match => {
+          if (match.groups) {
+            return Object.entries(match.groups)
+              .sort((a, b) => a[0].localeCompare(b[0]))
+              .map(entry => entry[1]);
+          }
+          return match.length == 1 ? [match[0]] : match.slice(1);
+        })
+        .flatMap(x => x)
+        .map(x => parseFloat(x))
+        .filter(Boolean);
       for (let index = 0; index < points.length; index++) {
         pushPoints(index, points[index]);
       }
@@ -107,6 +116,19 @@
     settingsOpen = false;
   }
 
+  function updateRegExp(ev) {
+    try {
+      pointExtractRegEx = new RegExp(
+        ev.target.value || DefaultExtractRegExp,
+        "gi"
+      );
+      regExpError = null;
+    } catch (err) {
+      console.log(err)
+      regExpError = err.message;
+    }
+  }
+
   function graph(node) {
     chart.streamTo(node, 300);
     node.width = node.parentElement.clientWidth;
@@ -134,7 +156,10 @@
     top: 8px;
   }
   .modal-background {
-    background-color: rgba(10,10,10,.4);;
+    background-color: rgba(10, 10, 10, 0.4);
+  }
+  .modal-card input {
+    font-family: "Courier New", Courier, monospace;
   }
 </style>
 
@@ -156,15 +181,41 @@
         <button class="delete" aria-label="close" on:click={closeSettings} />
       </header>
       <section class="modal-card-body">
-        <div class="field">
-          <label class="label">Chart speed</label>
-          <div class="control">
-            <div class="select">
-              <select bind:value={speed}>
-                {#each CHART_SPEEDS as speed, i}
-                  <option value={i}>{speed.name}</option>
-                {/each}
-              </select>
+        <div class="field is-horizontal">
+          <div class="field-label is-small">
+            <label class="label">Scroll Speed</label>
+          </div>
+          <div class="field-body">
+            <div class="field">
+              <div class="control">
+                <div class="select is-fullwidth">
+                  <select bind:value={speed}>
+                    {#each CHART_SPEEDS as speed, i}
+                      <option value={i}>{speed.name}</option>
+                    {/each}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="field is-horizontal">
+          <div class="field-label is-small">
+            <label class="label">Points RegExp</label>
+          </div>
+          <div class="field-body">
+            <div class="field">
+              <div class="control">
+                <input
+                  class="input"
+                  type="text"
+                  class:is-danger={regExpError}
+                  on:change={updateRegExp}
+                  value={pointExtractRegEx.source} />
+              </div>
+              {#if regExpError}
+                <p class="help is-danger">{regExpError}</p>
+              {/if}
             </div>
           </div>
         </div>

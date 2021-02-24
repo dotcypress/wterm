@@ -3,12 +3,13 @@
   import "bulma/css/bulma.min.css";
   import { onMount, afterUpdate } from "svelte";
   import {
-    TerminalIcon,
-    Trash2Icon,
-    RefreshCwIcon,
     BarChart2Icon,
+    CornerDownLeftIcon,
+    RefreshCwIcon,
+    RepeatIcon,
     SaveIcon,
-    CornerDownLeftIcon
+    TerminalIcon,
+    Trash2Icon
   } from "svelte-feather-icons";
   import * as xterm from "xterm";
   import { FitAddon } from "xterm-addon-fit";
@@ -29,7 +30,9 @@
   let navbarOpen = false;
   let chartOpen = false;
   let convertEol = false;
+  let localEcho = false;
   let decoder = new TextDecoder("utf-8");
+  var encoder = new TextEncoder("utf-8")
   let log = "";
 
   onMount(async () => {
@@ -44,6 +47,14 @@
     fitAddon.fit();
   });
 
+  function serialHook(bytes) {
+    terminal.write(bytes);
+    log += decoder.decode(bytes);
+    if (chart) {
+      chart.pushData(bytes);
+    }
+  }
+
   function connect() {
     connection = new WebSocket(`ws://${window.location.host}/ws`);
     connection.onopen = onOpen;
@@ -57,6 +68,9 @@
       if (convertEol) {
         data = data.replace(/\r/, "\r\n");
       }
+      if (localEcho) {
+        serialHook(encoder.encode(data));
+      }
       connected && connection.send(new Blob([data]));
     });
   }
@@ -69,10 +83,7 @@
     if (typeof data === "object") {
       const reader = new FileReader();
       reader.addEventListener("loadend", () => {
-        const bytes = new Uint8Array(reader.result);
-        serialHook(bytes);
-        terminal.write(bytes);
-        log += decoder.decode(bytes);
+        serialHook(new Uint8Array(reader.result));
       });
       reader.readAsArrayBuffer(data);
       return;
@@ -112,7 +123,7 @@
   function toggleConnection() {
     if (connection.readyState !== 1) {
       error = "Websocket closed. Reconnecting...";
-      setTimeout(connect, 700);
+      setTimeout(connect, 500);
       return;
     }
     localStorage.setItem("portName", portName);
@@ -134,6 +145,10 @@
 
   function toggleEol() {
     convertEol = !convertEol;
+  }
+
+  function toggleLocalEcho() {
+    localEcho = !localEcho;
   }
 
   function clear() {
@@ -160,10 +175,6 @@
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-  }
-
-  function serialHook(buffer) {
-    chart && chart.pushData(buffer);
   }
 </script>
 
@@ -279,6 +290,15 @@
               on:click={toggleEol}>
               <span class="icon is-small">
                 <CornerDownLeftIcon />
+              </span>
+            </button>
+            <button
+              class="button is-small is-info is-outlined"
+              title="Local echo"
+              class:is-light={localEcho}
+              on:click={toggleLocalEcho}>
+              <span class="icon is-small">
+                <RepeatIcon />
               </span>
             </button>
           </div>
