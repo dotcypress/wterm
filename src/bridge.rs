@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
-const POLL_INTERVAL: Duration = Duration::from_millis(10);
+const POLL_INTERVAL: Duration = Duration::from_millis(5);
 
 enum BridgeStatus {
     Disconnected,
