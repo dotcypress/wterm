@@ -377,6 +377,7 @@
     bottom: 0;
   }
   .workspace > .terminal {
+    margin: 8px;
     flex: 1;
     overflow: hidden;
   }
