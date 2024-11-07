@@ -1,48 +1,52 @@
-use actix::prelude::*;
-use actix::{Actor, StreamHandler};
-use actix_web_actors::ws::{Message, ProtocolError, WebsocketContext};
+use actix_ws::{Closed, Message, Session};
 use bytes::Bytes;
-use serialport::{self, SerialPort, SerialPortSettings};
+use serialport::{self, SerialPort};
 use std::fmt::Display;
-use std::time::{Duration, Instant};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
-const POLL_INTERVAL: Duration = Duration::from_millis(5);
-
+#[derive(Debug)]
 enum BridgeStatus {
     Disconnected,
     Connected(Box<dyn SerialPort>),
 }
 
-pub struct BridgeSession {
-    last_seen: Instant,
-    status: BridgeStatus,
+#[derive(Debug, Clone)]
+pub struct Bridge {
+    status: Arc<Mutex<BridgeStatus>>,
 }
 
-impl BridgeSession {
-    pub fn new() -> BridgeSession {
-        BridgeSession {
-            last_seen: Instant::now(),
-            status: BridgeStatus::Disconnected,
+impl Bridge {
+    pub fn new() -> Bridge {
+        Bridge {
+            status: Arc::new(Mutex::new(BridgeStatus::Disconnected)),
         }
     }
 
-    fn send_status(&self, ctx: &mut WebsocketContext<Self>) {
-        let conn_status = match self.status {
-            BridgeStatus::Disconnected => "DOWN",
-            BridgeStatus::Connected(_) => "UP",
-        };
-        let mut resp = String::from("OK: ");
-        resp.push_str(conn_status);
-        ctx.text(resp);
+    pub async fn handle(&self, msg: Message, session: &mut Session) -> Result<(), Closed> {
+        match msg {
+            Message::Close(_) => Err(Closed),
+            Message::Ping(msg) => session.pong(&msg).await,
+            Message::Binary(data) => self.blob(session, data).await,
+            Message::Text(text) => {
+                let params: Vec<&str> = text.split(' ').collect();
+                if let Some((command, args)) = params.split_first() {
+                    match *command {
+                        "STATUS" => self.send_status(session).await,
+                        "CONNECT" => self.connect(session, args).await,
+                        "DISCONNECT" => self.disconnect(session).await,
+                        "LIST" => self.list(session).await,
+                        _ => self.send_error(session, "Unsupported command").await,
+                    }
+                } else {
+                    session.binary(text.as_bytes().clone()).await
+                }
+            }
+            _ => Ok(()),
+        }
     }
 
-    fn send_error(&self, ctx: &mut WebsocketContext<Self>, err: impl Display) {
-        ctx.text(format!("ERROR: {}", err));
-    }
-
-    fn list(&self, ctx: &mut WebsocketContext<Self>) {
+    async fn list(&self, session: &mut Session) -> Result<(), Closed> {
         let ports: Vec<String> = serialport::available_ports()
             .unwrap_or_default()
             .into_iter()
@@ -50,50 +54,66 @@ impl BridgeSession {
             .collect();
         let mut resp = String::from("LIST: ");
         resp.push_str(&ports.join(" "));
-        ctx.text(resp);
+        session.text(resp).await
     }
 
-    fn connect(&mut self, ctx: &mut WebsocketContext<Self>, args: &[&str]) {
-        let mut settings = SerialPortSettings::default();
+    async fn connect(&self, session: &mut Session, args: &[&str]) -> Result<(), Closed> {
         if args.is_empty() {
-            return self.send_error(ctx, "Port is required");
+            return self.send_error(session, "Port is required").await;
         }
-        if let Some(baud_rate) = args.get(1) {
+        let baud_rate = if let Some(baud_rate) = args.get(1) {
             match baud_rate.parse() {
-                Ok(baud_rate) => settings.baud_rate = baud_rate,
-                Err(err) => return self.send_error(ctx, err),
+                Ok(baud_rate) => baud_rate,
+                Err(err) => return self.send_error(session, err).await,
             }
-        }
-        match serialport::open_with_settings(args[0], &settings) {
+        } else {
+            115200
+        };
+        match serialport::new(args[0], baud_rate).open() {
             Ok(serial_port) => {
-                self.status = BridgeStatus::Connected(serial_port);
-                self.send_status(ctx);
+                *self.status.lock().await = BridgeStatus::Connected(serial_port);
+                self.send_status(session).await
             }
             Err(err) => {
-                self.status = BridgeStatus::Disconnected;
-                self.send_error(ctx, err);
+                *self.status.lock().await = BridgeStatus::Disconnected;
+                self.send_error(session, err).await
             }
         }
     }
 
-    fn disconnect(&mut self, ctx: &mut WebsocketContext<Self>) {
-        self.status = BridgeStatus::Disconnected;
-        self.send_status(ctx);
+    async fn disconnect(&self, session: &mut Session) -> Result<(), Closed> {
+        *self.status.lock().await = BridgeStatus::Disconnected;
+        self.send_status(session).await
     }
 
-    fn blob(&mut self, ctx: &mut WebsocketContext<Self>, data: Bytes) {
-        match &mut self.status {
-            BridgeStatus::Disconnected => self.send_error(ctx, "Disconnected"),
+    async fn blob(&self, session: &mut Session, data: Bytes) -> Result<(), Closed> {
+        match &mut *self.status.lock().await {
+            BridgeStatus::Disconnected => self.send_error(session, "Disconnected").await,
             BridgeStatus::Connected(port) => {
                 if let Err(err) = port.write_all(data.as_ref()) {
-                    self.send_error(ctx, err);
+                    return self.send_error(session, err).await;
                 }
+                Ok(())
             }
-        };
+        }
     }
 
-    fn poll_serial(&mut self, ctx: &mut WebsocketContext<BridgeSession>) {
-        if let BridgeStatus::Connected(port) = &mut self.status {
+    async fn send_status(&self, session: &mut Session) -> Result<(), Closed> {
+        let conn_status = match *self.status.lock().await {
+            BridgeStatus::Disconnected => "DOWN",
+            BridgeStatus::Connected(_) => "UP",
+        };
+        let mut resp = String::from("OK: ");
+        resp.push_str(conn_status);
+        session.text(resp).await
+    }
+
+    async fn send_error(&self, session: &mut Session, err: impl Display) -> Result<(), Closed> {
+        session.text(format!("ERROR: {}", err)).await
+    }
+
+    pub async fn poll_serial(&self, session: &mut Session) {
+        if let BridgeStatus::Connected(port) = &mut *self.status.lock().await {
             while let Ok(len) = port.bytes_to_read() {
                 if len == 0 {
                     break;
@@ -101,62 +121,16 @@ impl BridgeSession {
                 let mut buff = [0u8; 64 * 1024];
                 match port.read(&mut buff) {
                     Ok(n) => {
-                        let mut data = Bytes::new();
+                        let mut data = Vec::new();
                         data.extend_from_slice(&buff[..n]);
-                        ctx.binary(data);
+                        session.binary(data).await.ok();
                     }
                     Err(err) => {
-                        self.send_error(ctx, err);
+                        self.send_error(session, err).await.ok();
                         break;
                     }
                 }
             }
-        }
-        ctx.run_later(POLL_INTERVAL, |act, ctx| act.poll_serial(ctx));
-    }
-}
-
-impl Actor for BridgeSession {
-    type Context = WebsocketContext<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
-            if Instant::now().duration_since(act.last_seen) < CLIENT_TIMEOUT {
-                return ctx.ping("");
-            }
-            ctx.stop();
-        });
-        ctx.run_later(POLL_INTERVAL, |act, ctx| act.poll_serial(ctx));
-    }
-}
-
-impl StreamHandler<Message, ProtocolError> for BridgeSession {
-    fn handle(&mut self, msg: Message, ctx: &mut Self::Context) {
-        match msg {
-            Message::Binary(data) => self.blob(ctx, data),
-            Message::Text(text) => {
-                let params: Vec<&str> = text.split(' ').collect();
-                if let Some((command, args)) = params.split_first() {
-                    match *command {
-                        "STATUS" => self.send_status(ctx),
-                        "CONNECT" => self.connect(ctx, args),
-                        "DISCONNECT" => self.disconnect(ctx),
-                        "LIST" => self.list(ctx),
-                        _ => self.send_error(ctx, "Unsupported command"),
-                    }
-                } else {
-                    ctx.binary(text);
-                }
-            }
-            Message::Ping(msg) => {
-                self.last_seen = Instant::now();
-                ctx.pong(&msg);
-            }
-            Message::Pong(_) => {
-                self.last_seen = Instant::now();
-            }
-            Message::Close(_) => ctx.stop(),
-            Message::Nop => (),
         }
     }
 }

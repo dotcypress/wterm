@@ -1,10 +1,11 @@
 #[cfg(debug_assertions)]
 use actix_files::NamedFile;
-use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer, Result};
-use actix_web_actors::ws;
-use std::net::SocketAddr;
+use actix_web::{web, App, HttpRequest, HttpServer, Responder};
+use bridge::Bridge;
+use futures_util::stream::StreamExt;
 #[cfg(debug_assertions)]
 use std::path::PathBuf;
+use std::{io, net::SocketAddr, time::Duration};
 use structopt::StructOpt;
 
 mod bridge;
@@ -21,7 +22,7 @@ struct Cli {
 }
 
 #[cfg(debug_assertions)]
-fn index(req: HttpRequest) -> Result<NamedFile> {
+async fn index(req: HttpRequest) -> NamedFile {
     let filename: String = req
         .match_info()
         .query("filename")
@@ -33,14 +34,14 @@ fn index(req: HttpRequest) -> Result<NamedFile> {
     } else {
         path.push(filename);
     }
-    Ok(NamedFile::open(path)?)
+    NamedFile::open(path).unwrap()
 }
 
 #[cfg(not(debug_assertions))]
-fn index(req: HttpRequest) -> HttpResponse {
-    static ICON: &'static [u8] = include_bytes!("./../static/favicon.png");
-    static HOME: &'static str = include_str!("./../static/index.html");
-    static JS: &'static str = include_str!("./../static/wterm.js");
+async fn index(req: HttpRequest) -> actix_web::HttpResponse {
+    static ICON: &[u8] = include_bytes!("./../static/favicon.png");
+    static HOME: &str = include_str!("./../static/index.html");
+    static JS: &str = include_str!("./../static/wterm.js");
 
     let filename = req
         .match_info()
@@ -49,31 +50,62 @@ fn index(req: HttpRequest) -> HttpResponse {
         .expect("Failed to parse filename");
 
     match filename.as_ref() {
-        "" | "index.html" => HttpResponse::Ok()
+        "" | "index.html" => actix_web::HttpResponse::Ok()
             .content_type("text/html; charset=utf-8")
             .body(HOME),
-        "wterm.js" => HttpResponse::Ok()
+        "wterm.js" => actix_web::HttpResponse::Ok()
             .content_type("text/javascript; charset=utf-8")
             .body(JS),
-        "favicon.png" => HttpResponse::Ok().content_type("image/png").body(ICON),
-        _ => HttpResponse::NotFound().finish(),
+        "favicon.png" => actix_web::HttpResponse::Ok().content_type("image/png").body(ICON),
+        _ => actix_web::HttpResponse::NotFound().finish(),
     }
 }
 
-fn ws_bridge(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
-    ws::start(bridge::BridgeSession::new(), &req, stream)
+async fn ws(
+    req: HttpRequest,
+    body: web::Payload,
+    bridge: web::Data<Bridge>,
+) -> actix_web::Result<impl Responder> {
+    let (response, session, mut msg_stream) = actix_ws::handle(&req, body)?;
+
+    let ws_bridge = bridge.clone();
+    let mut ws_session = session.clone();
+    actix_web::rt::spawn(async move {
+        while let Some(Ok(msg)) = msg_stream.next().await {
+            if ws_bridge.handle(msg, &mut ws_session).await.is_err() {
+                break;
+            }
+        }
+        let _ = ws_session.close(None).await;
+    });
+
+    let serial_bridge = bridge.clone();
+    let mut poll_session = session.clone();
+    actix_web::rt::spawn(async move {
+        loop {
+            serial_bridge.poll_serial(&mut poll_session).await;
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    });
+
+    Ok(response)
 }
 
-fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> io::Result<()> {
     let cli = Cli::from_args();
     println!("http://{}", cli.addr);
+    let session = Bridge::new();
     HttpServer::new(move || {
         App::new()
-            .service(web::resource("/ws").to(ws_bridge))
+            .app_data(web::Data::new(session.clone()))
+            .service(web::resource("/ws").to(ws))
             .route("/{filename:.*}", web::get().to(index))
     })
     .bind(cli.addr)
     .expect("Failed to bind to network interface")
     .run()
-    .expect("Failed to start server");
+    .await?;
+
+    Ok(())
 }
