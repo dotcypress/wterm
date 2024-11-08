@@ -5,7 +5,7 @@ use bridge::Bridge;
 use futures_util::stream::StreamExt;
 #[cfg(debug_assertions)]
 use std::path::PathBuf;
-use std::{io, net::SocketAddr, time::Duration};
+use std::{io, net::SocketAddr};
 use structopt::StructOpt;
 
 mod bridge;
@@ -56,7 +56,9 @@ async fn index(req: HttpRequest) -> actix_web::HttpResponse {
         "wterm.js" => actix_web::HttpResponse::Ok()
             .content_type("text/javascript; charset=utf-8")
             .body(JS),
-        "favicon.png" => actix_web::HttpResponse::Ok().content_type("image/png").body(ICON),
+        "favicon.png" => actix_web::HttpResponse::Ok()
+            .content_type("image/png")
+            .body(ICON),
         _ => actix_web::HttpResponse::NotFound().finish(),
     }
 }
@@ -66,26 +68,23 @@ async fn ws(
     body: web::Payload,
     bridge: web::Data<Bridge>,
 ) -> actix_web::Result<impl Responder> {
-    let (response, session, mut msg_stream) = actix_ws::handle(&req, body)?;
+    let (response, session, mut stream) = actix_ws::handle(&req, body)?;
+    let serial_bridge = bridge.clone();
+    let mut poll_session = session.clone();
+
+    actix_web::rt::spawn(async move {
+        serial_bridge.poll_serial(&mut poll_session).await
+    });
 
     let ws_bridge = bridge.clone();
     let mut ws_session = session.clone();
     actix_web::rt::spawn(async move {
-        while let Some(Ok(msg)) = msg_stream.next().await {
+        while let Some(Ok(msg)) = stream.next().await {
             if ws_bridge.handle(msg, &mut ws_session).await.is_err() {
                 break;
             }
         }
         let _ = ws_session.close(None).await;
-    });
-
-    let serial_bridge = bridge.clone();
-    let mut poll_session = session.clone();
-    actix_web::rt::spawn(async move {
-        loop {
-            serial_bridge.poll_serial(&mut poll_session).await;
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        }
     });
 
     Ok(response)

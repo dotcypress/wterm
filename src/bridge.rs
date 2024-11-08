@@ -3,6 +3,7 @@ use bytes::Bytes;
 use serialport::{self, SerialPort};
 use std::fmt::Display;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 
 #[derive(Debug)]
@@ -112,25 +113,26 @@ impl Bridge {
         session.text(format!("ERROR: {}", err)).await
     }
 
-    pub async fn poll_serial(&self, session: &mut Session) {
-        if let BridgeStatus::Connected(port) = &mut *self.status.lock().await {
-            while let Ok(len) = port.bytes_to_read() {
-                if len == 0 {
-                    break;
-                }
-                let mut buff = [0u8; 64 * 1024];
-                match port.read(&mut buff) {
-                    Ok(n) => {
-                        let mut data = Vec::new();
-                        data.extend_from_slice(&buff[..n]);
-                        session.binary(data).await.ok();
-                    }
-                    Err(err) => {
-                        self.send_error(session, err).await.ok();
+    pub async fn poll_serial(&self, session: &mut Session) -> Result<(), Closed> {
+        loop {
+            if let BridgeStatus::Connected(port) = &mut *self.status.lock().await {
+                loop {
+                    if let Ok(0) = port.bytes_to_read() {
                         break;
+                    }
+                    let mut buff = [0u8; 64 * 1024];
+                    match port.read(&mut buff) {
+                        Ok(n) => {
+                            let data = Bytes::copy_from_slice(&buff[..n]);
+                            session.binary(data).await?;
+                        }
+                        Err(err) => {
+                            self.send_error(session, err).await?;
+                        }
                     }
                 }
             }
+            tokio::time::sleep(Duration::from_millis(1)).await;
         }
     }
 }

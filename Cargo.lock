@@ -1816,7 +1816,7 @@ checksum = "1e9df38ee2d2c3c5948ea468a8406ff0db0b29ae1ffde1bcf20ef305bcc95c51"
 
 [[package]]
 name = "wterm"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "actix",
  "actix-files",
